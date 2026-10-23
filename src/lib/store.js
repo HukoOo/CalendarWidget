@@ -12,7 +12,9 @@ const DEFAULT_SETTINGS = {
   placement: 'desktop', // 'desktop' 바탕화면에 고정 | 'normal' 일반 창 | 'top' 항상 위
   locked: false,
   launchAtLogin: false,
-  bounds: null,
+  expanded: false, // 크게 보기 상태
+  bounds: null, // 기본 크기일 때의 창 위치·크기
+  expandedBounds: null, // 크게 보기일 때의 창 위치·크기
 };
 
 function filePath(name) {

@@ -4,6 +4,9 @@ const api = window.calendarApi;
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 const DAY_MS = 24 * 60 * 60 * 1000;
 const VIEW_KEY = 'calendar-widget.view';
+const WIDE_MIN = 520; // 이 너비부터 달력 칸에 점 대신 일정 제목을 표시한다.
+const SIDE_MIN = 760; // 이 너비부터 선택한 날의 일정을 달력 오른쪽에 붙인다.
+const MAX_CHIPS = 8; // 칸 하나에 만들어 두는 최대 칩 수 (넘치는 것은 fitChips가 숨긴다)
 
 let state = { events: [], errors: [], lastSync: null, syncing: false, sourceCount: 0, monthsAhead: 2 };
 let settings = { daysAhead: 14, opacity: 0.92, locked: false };
@@ -166,7 +169,46 @@ function navButton(label, title, disabled, onClick) {
   return btn;
 }
 
+function chipFor(ev) {
+  const chip = el('div', ev.allDay ? 'chip all-day' : 'chip');
+  chip.style.setProperty('--c', ev.color || '#3b82f6');
+  const time = ev.allDay ? '' : `${fmtTime(new Date(ev.start))} `;
+  chip.textContent = `${time}${ev.title}`;
+  return chip;
+}
+
+// 마지막으로 보이는 칩이 칸 아래 경계를 넘는지 본다. 1fr 행 높이는 소수점이라 scrollHeight 비교만으로는 1~2px 잘린다.
+function overflowing(cell) {
+  const visible = [...cell.querySelectorAll('.chip')].filter((n) => !n.hidden);
+  const last = visible[visible.length - 1];
+  return Boolean(last) && last.getBoundingClientRect().bottom > cell.getBoundingClientRect().bottom - 2;
+}
+
+// 칸 높이에 맞춰 넘치는 칩을 뒤에서부터 숨기고 "+n개"로 바꾼다. 레이아웃이 잡힌 뒤에 불러야 한다.
+function fitChips(root) {
+  for (const cell of root.querySelectorAll('.cell.wide')) {
+    const chips = [...cell.querySelectorAll('.chip')];
+    const more = cell.querySelector('.more-count');
+    let hidden = Number(cell.dataset.extra);
+    for (const chip of chips) chip.hidden = false;
+    const showMore = () => {
+      more.hidden = hidden === 0;
+      more.textContent = `+${hidden}개`;
+    };
+    showMore();
+    for (let i = chips.length - 1; i >= 0 && overflowing(cell); i--) {
+      chips[i].hidden = true;
+      hidden++;
+      showMore();
+    }
+  }
+}
+
 function renderMonth(container, now) {
+  const width = window.innerWidth;
+  const wide = width >= WIDE_MIN;
+  container.classList.toggle('month-wide', wide);
+  container.classList.toggle('month-side', width >= SIDE_MIN);
   const today = startOfDay(now);
   const { min, max } = monthBounds(today);
   if (monthCursor < min) monthCursor = min;
@@ -211,14 +253,27 @@ function renderMonth(container, now) {
 
     const items = eventsOn(day);
     cell.title = items.map((ev) => ev.title).join('\n');
-    const dots = el('div', 'dots');
-    for (const ev of items.slice(0, 3)) {
-      const dot = el('span', 'dot');
-      dot.style.setProperty('--c', ev.color || '#3b82f6');
-      dots.append(dot);
+    const num = el('span', 'num', String(day.getDate()));
+    if (wide) {
+      // "+n개"는 날짜 옆에 둬서 칩 자리를 하나라도 더 확보한다.
+      cell.classList.add('wide');
+      cell.dataset.extra = String(Math.max(0, items.length - MAX_CHIPS));
+      const head = el('div', 'cell-head');
+      head.append(num, el('span', 'more-count'));
+      const chips = el('div', 'chips');
+      for (const ev of items.slice(0, MAX_CHIPS)) chips.append(chipFor(ev));
+      cell.append(head, chips);
+    } else {
+      cell.append(num);
+      const dots = el('div', 'dots');
+      for (const ev of items.slice(0, 3)) {
+        const dot = el('span', 'dot');
+        dot.style.setProperty('--c', ev.color || '#3b82f6');
+        dots.append(dot);
+      }
+      if (items.length > 3) dots.append(el('span', 'more', '+'));
+      cell.append(dots);
     }
-    if (items.length > 3) dots.append(el('span', 'more', '+'));
-    cell.append(el('span', 'num', String(day.getDate())), dots);
 
     cell.addEventListener('click', () => {
       selectedDay = day;
@@ -228,7 +283,12 @@ function renderMonth(container, now) {
     grid.append(cell);
   }
 
-  container.append(nav, head, grid, renderDay(selectedDay, today, now));
+  const calendar = el('div', 'month-cal');
+  calendar.append(head, grid);
+  const body = el('div', 'month-body');
+  body.append(calendar, renderDay(selectedDay, today, now));
+  container.append(nav, body);
+  if (wide) requestAnimationFrame(() => fitChips(grid));
 }
 
 // ---------- 전체 ----------
@@ -236,6 +296,7 @@ function renderMonth(container, now) {
 function renderBody(now) {
   const list = $('list');
   list.replaceChildren();
+  list.classList.remove('month-wide', 'month-side');
 
   if (state.sourceCount === 0) {
     const hint = el('div', 'hint', '연결된 캘린더가 없습니다.');
@@ -260,6 +321,8 @@ function render() {
   $('btn-refresh').classList.toggle('spin', Boolean(state.syncing));
   $('btn-view').textContent = view === 'month' ? '☰' : '▦';
   $('btn-view').title = view === 'month' ? '목록 보기' : '월간 보기';
+  $('btn-expand').textContent = settings.expanded ? '⤡' : '⤢';
+  $('btn-expand').title = settings.expanded ? '작게 보기' : '크게 보기';
 
   renderBody(now);
 
@@ -280,7 +343,86 @@ $('btn-view').addEventListener('click', () => {
   saveView();
   render();
 });
+$('btn-expand').addEventListener('click', () => {
+  const expand = !settings.expanded;
+  // 크게 볼 때는 달력이 목적이므로 월간 보기로 바꾼다.
+  if (expand && view !== 'month') {
+    view = 'month';
+    saveView();
+  }
+  api.setExpanded(expand);
+});
 $('btn-refresh').addEventListener('click', () => api.refresh());
+
+// ---------- 크기 조절 핸들 ----------
+// 투명 창은 Windows에서 테두리 크기 조절이 안 되므로 가장자리·모서리에 핸들을 두고 직접 계산한다.
+// 화면 좌표(screenX/Y)와 창 bounds는 둘 다 DIP 단위라 그대로 더하고 뺄 수 있다.
+const MIN_W = 260;
+const MIN_H = 200;
+
+function startResize(e) {
+  if (settings.locked || e.button !== 0) return;
+  e.preventDefault();
+  const handle = e.currentTarget;
+  const dir = handle.dataset.dir;
+  handle.setPointerCapture(e.pointerId); // 포인터가 창 밖으로 나가도 계속 이벤트를 받는다.
+  const sx = e.screenX;
+  const sy = e.screenY;
+  let start = null;
+
+  const move = (ev) => {
+    if (!start) return;
+    const dx = ev.screenX - sx;
+    const dy = ev.screenY - sy;
+    let { x, y, width, height } = start;
+    if (dir.includes('e')) width += dx;
+    if (dir.includes('s')) height += dy;
+    if (dir.includes('w')) {
+      width -= dx;
+      x += dx;
+    }
+    if (dir.includes('n')) {
+      height -= dy;
+      y += dy;
+    }
+    // 최소 크기에 걸리면 반대쪽 가장자리가 밀려나지 않게 위치를 되돌린다.
+    if (width < MIN_W) {
+      if (dir.includes('w')) x -= MIN_W - width;
+      width = MIN_W;
+    }
+    if (height < MIN_H) {
+      if (dir.includes('n')) y -= MIN_H - height;
+      height = MIN_H;
+    }
+    // pointermove는 Chromium이 이미 프레임 단위로 묶어 보낸다. requestAnimationFrame은 창이 가려지면 멈추므로 쓰지 않는다.
+    api.setBounds({ x, y, width, height });
+  };
+  const end = () => {
+    handle.removeEventListener('pointermove', move);
+    handle.removeEventListener('pointerup', end);
+    handle.removeEventListener('pointercancel', end);
+  };
+  handle.addEventListener('pointermove', move);
+  handle.addEventListener('pointerup', end);
+  handle.addEventListener('pointercancel', end);
+  api.getBounds().then((b) => {
+    start = b;
+  });
+}
+
+for (const dir of ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw']) {
+  const handle = el('div', `resize resize-${dir}`);
+  handle.dataset.dir = dir;
+  handle.addEventListener('pointerdown', startResize);
+  document.body.append(handle);
+}
+
+// 창 크기가 바뀌면 칸 크기·레이아웃이 달라지므로 다시 그린다.
+let resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(render, 100);
+});
 $('btn-settings').addEventListener('click', () => api.openSettings());
 $('btn-errors').addEventListener('click', () => api.openSettings());
 

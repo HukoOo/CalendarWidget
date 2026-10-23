@@ -123,7 +123,69 @@ body.locked .head { -webkit-app-region: no-drag; }
 .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--c); }
 .more { font-size: 9px; line-height: 5px; color: var(--fg-dim); }
 
-.month-grid + .day { margin-top: 6px; border-top: 1px solid var(--line); }
+.month-cal + .day { margin-top: 6px; border-top: 1px solid var(--line); }
+
+/* 넓은 월간 보기: 달력이 남은 공간을 채우고 칸에 일정 제목을 표시 */
+.list.month-wide { display: flex; flex-direction: column; overflow: hidden; padding-bottom: 0; }
+.list.month-wide .month-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.list.month-wide .month-cal { flex: 1; min-height: 0; min-width: 0; display: flex; flex-direction: column; }
+.list.month-wide .month-grid { flex: 1; min-height: 0; grid-auto-rows: minmax(0, 1fr); gap: 3px; padding-bottom: 8px; }
+.list.month-wide .month-cal + .day { flex: none; max-height: 38%; overflow-y: auto; }
+
+/* 더 넓으면 선택한 날의 일정을 오른쪽에 */
+.list.month-side .month-body { flex-direction: row; }
+.list.month-side .month-cal + .day {
+  width: 280px; max-height: none;
+  margin-top: 0; border-top: 0; border-left: 1px solid var(--line);
+}
+
+.cell.wide {
+  height: auto; min-height: 0;
+  align-items: stretch; justify-content: flex-start; gap: 2px;
+  padding: 3px 3px 2px;
+  overflow: hidden;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.03);
+}
+.cell.wide.selected { background: rgba(255, 255, 255, 0.10); }
+.cell-head { display: flex; align-items: center; justify-content: space-between; flex: none; }
+.cell.wide .num { width: 22px; height: 22px; flex: none; }
+.chips { display: flex; flex-direction: column; gap: 2px; flex: none; } /* 줄어들지 않아야 fitChips가 넘침을 잴 수 있다 */
+.chip {
+  padding: 0 5px;
+  border-left: 3px solid var(--c); border-radius: 3px;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 11px; line-height: 17px; text-align: left;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  flex: none;
+}
+.chip.all-day { background: color-mix(in srgb, var(--c) 35%, transparent); }
+.more-count { padding-right: 3px; font-size: 10px; line-height: 14px; color: var(--fg-dim); }
+.chip[hidden], .more-count[hidden] { display: none; }
+
+/* 크기 조절 핸들: 창 가장자리 6px, 모서리 14px. 머리글의 드래그 영역보다 위에 둔다. */
+.resize { position: fixed; z-index: 10; -webkit-app-region: no-drag; }
+.resize-n, .resize-s { left: 14px; right: 14px; height: 6px; cursor: ns-resize; }
+.resize-n { top: 0; }
+.resize-s { bottom: 0; }
+.resize-e, .resize-w { top: 14px; bottom: 14px; width: 6px; cursor: ew-resize; }
+.resize-e { right: 0; }
+.resize-w { left: 0; }
+.resize-ne, .resize-nw, .resize-se, .resize-sw { width: 14px; height: 14px; }
+.resize-ne { top: 0; right: 0; cursor: nesw-resize; }
+.resize-sw { bottom: 0; left: 0; cursor: nesw-resize; }
+.resize-nw { top: 0; left: 0; cursor: nwse-resize; }
+.resize-se {
+  bottom: 0; right: 0; cursor: nwse-resize;
+  /* 오른쪽 아래에 크기 조절 표시(빗금 두 줄) */
+  width: 16px; height: 16px;
+  background:
+    linear-gradient(135deg, transparent 45%, rgba(255, 255, 255, 0.45) 45%, rgba(255, 255, 255, 0.45) 53%, transparent 53%,
+      transparent 66%, rgba(255, 255, 255, 0.45) 66%, rgba(255, 255, 255, 0.45) 74%, transparent 74%);
+  border-bottom-right-radius: 12px;
+}
+.resize-se:hover { filter: brightness(1.6); }
+body.locked .resize { display: none; }
 .hint { padding: 32px 20px; text-align: center; color: var(--fg-dim); }
 .hint button {
   margin-top: 12px; padding: 6px 14px;

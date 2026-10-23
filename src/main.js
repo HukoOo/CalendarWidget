@@ -13,7 +13,8 @@ const MONTHS_AHEAD = 2; // 월간 보기에서 이번 달 이후로 넘겨 볼 �
 const PLACEMENTS = ['desktop', 'normal', 'top'];
 
 // 개발 실행(npm start)과 설치본이 같은 설정 폴더(%APPDATA%\CalendarWidget)를 쓰도록 고정한다.
-app.setPath('userData', path.join(app.getPath('appData'), 'CalendarWidget'));
+// 실제 설정을 건드리지 않고 시험하려면 CALENDAR_WIDGET_DATA_DIR로 다른 폴더를 지정한다.
+app.setPath('userData', process.env.CALENDAR_WIDGET_DATA_DIR || path.join(app.getPath('appData'), 'CalendarWidget'));
 
 let config;
 let icon;
@@ -86,13 +87,8 @@ function webPreferences() {
 }
 
 function createWidget() {
-  const area = screen.getPrimaryDisplay().workArea;
-  const bounds = visibleBounds(config.settings.bounds) || {
-    width: 340,
-    height: 540,
-    x: area.x + area.width - 360,
-    y: area.y + 20,
-  };
+  const saved = config.settings.expanded ? config.settings.expandedBounds : config.settings.bounds;
+  const bounds = visibleBounds(saved) || (config.settings.expanded ? defaultExpandedBounds() : defaultCompactBounds());
 
   widget = new BrowserWindow({
     ...bounds,
@@ -125,7 +121,7 @@ function createWidget() {
 
   const saveBounds = debounce(() => {
     if (!widget || widget.isDestroyed()) return;
-    config.settings.bounds = widget.getBounds();
+    config.settings[config.settings.expanded ? 'expandedBounds' : 'bounds'] = widget.getBounds();
     store.save(config);
   }, 500);
   widget.on('move', saveBounds);
@@ -142,6 +138,42 @@ function createWidget() {
     widget = null;
     if (!quitting) setTimeout(createWidget, 2000);
   });
+}
+
+function defaultCompactBounds() {
+  const area = screen.getPrimaryDisplay().workArea;
+  return { width: 340, height: 540, x: area.x + area.width - 360, y: area.y + 20 };
+}
+
+// 크게 보기 기본 크기: 위젯이 있는 모니터 가운데에 최대 1000x720.
+function defaultExpandedBounds() {
+  const area = widget ? screen.getDisplayMatching(widget.getBounds()).workArea : screen.getPrimaryDisplay().workArea;
+  const width = Math.min(1000, area.width - 40);
+  const height = Math.min(720, area.height - 40);
+  return {
+    width,
+    height,
+    x: area.x + Math.round((area.width - width) / 2),
+    y: area.y + Math.round((area.height - height) / 2),
+  };
+}
+
+// 기본 크기와 크게 보기 크기를 각각 기억해 두고 전환한다.
+function setExpanded(on) {
+  if (!widget || widget.isDestroyed() || on === config.settings.expanded) return;
+  const current = widget.getBounds();
+  let target;
+  if (on) {
+    config.settings.bounds = current;
+    target = visibleBounds(config.settings.expandedBounds) || defaultExpandedBounds();
+  } else {
+    config.settings.expandedBounds = current;
+    target = visibleBounds(config.settings.bounds) || defaultCompactBounds();
+  }
+  config.settings.expanded = on;
+  store.save(config);
+  widget.setBounds(target);
+  broadcast('settings:update', publicSettings());
 }
 
 function applyPlacement() {
@@ -249,6 +281,7 @@ function sanitizeSettings(input) {
     placement: PLACEMENTS.includes(s.placement) && (s.placement !== 'desktop' || desktop.isSupported()) ? s.placement : 'normal',
     locked: Boolean(s.locked),
     launchAtLogin: Boolean(s.launchAtLogin),
+    expanded: Boolean(s.expanded),
   };
 }
 
@@ -301,7 +334,7 @@ function updateSettings(patch) {
 }
 
 function publicSettings() {
-  const { bounds, ...rest } = config.settings;
+  const { bounds, expandedBounds, ...rest } = config.settings;
   return { ...rest, desktopSupported: desktop.isSupported() };
 }
 
@@ -416,6 +449,21 @@ function checkNotifications() {
 ipcMain.handle('state:get', () => ({ state: publicState(), settings: publicSettings() }));
 ipcMain.handle('refresh', () => refreshAll());
 ipcMain.handle('settings:open', () => openSettings());
+ipcMain.handle('widget:expand', (_e, on) => setExpanded(Boolean(on)));
+
+// 투명 창은 Windows에서 테두리를 끌어 크기를 바꿀 수 없어서, 렌더러의 가장자리 핸들이 계산한 크기를 받아 적용한다.
+ipcMain.handle('widget:get-bounds', () => (widget && !widget.isDestroyed() ? widget.getBounds() : null));
+ipcMain.on('widget:set-bounds', (_e, b) => {
+  if (!widget || widget.isDestroyed() || config.settings.locked) return;
+  if (![b?.x, b?.y, b?.width, b?.height].every(Number.isFinite)) return;
+  const [minWidth, minHeight] = widget.getMinimumSize();
+  widget.setBounds({
+    x: Math.round(b.x),
+    y: Math.round(b.y),
+    width: Math.max(minWidth, Math.round(b.width)),
+    height: Math.max(minHeight, Math.round(b.height)),
+  });
+});
 
 ipcMain.handle('config:get', () => ({
   sources: config.sources.map(store.publicSource),
@@ -425,7 +473,8 @@ ipcMain.handle('config:get', () => ({
 ipcMain.handle('config:save', (_e, payload) => {
   const prev = config.settings;
   config.sources = sanitizeSources(Array.isArray(payload?.sources) ? payload.sources : config.sources);
-  config.settings = sanitizeSettings(payload?.settings || {});
+  // 크게 보기 상태는 위젯 버튼으로만 바꾼다. 설정 창이 오래된 값을 보내도 덮어쓰지 않는다.
+  config.settings = sanitizeSettings({ ...(payload?.settings || {}), expanded: prev.expanded });
   store.save(config);
   applySettings(prev);
   refreshAll();
