@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'">
+  <title>캘린더 위젯</title>
+  <link rel="stylesheet" href="widget.css">
+</head>
+<body>
+  <div class="card">
+    <header class="head">
+      <div class="today">
+        <span id="today-day" class="today-day"></span>
+        <span id="today-sub" class="today-sub"></span>
+      </div>
+      <div class="actions">
+        <button id="btn-view" class="icon-btn"></button>
+        <button id="btn-refresh" class="icon-btn" title="새로고침">⟳</button>
+        <button id="btn-settings" class="icon-btn" title="설정">⚙</button>
+      </div>
+    </header>
+    <main id="list" class="list"></main>
+    <footer class="foot">
+      <span id="status"></span>
+      <button id="btn-errors" class="warn" hidden></button>
+    </footer>
+  </div>
+  <script src="widget.js"></script>
+</body>
+</html>

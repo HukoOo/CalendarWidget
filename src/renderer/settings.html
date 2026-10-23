@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'">
+  <title>캘린더 위젯 설정</title>
+  <link rel="stylesheet" href="settings.css">
+</head>
+<body>
+  <section class="panel">
+    <div class="panel-head">
+      <h2>캘린더</h2>
+      <div class="add">
+        <select id="add-preset">
+          <option value="google">Google 캘린더</option>
+          <option value="outlook">Outlook / Microsoft 365</option>
+          <option value="naver">네이버 캘린더</option>
+          <option value="icloud">iCloud</option>
+          <option value="ics">기타 ICS 주소</option>
+          <option value="caldav">기타 CalDAV</option>
+        </select>
+        <button id="btn-add" class="primary">추가</button>
+      </div>
+    </div>
+    <ul id="source-list" class="sources"></ul>
+    <p id="no-sources" class="muted" hidden>아직 추가한 캘린더가 없습니다. 위에서 서비스를 고르고 '추가'를 누르세요.</p>
+  </section>
+
+  <section id="editor" class="panel" hidden>
+    <h2 id="editor-title">캘린더 추가</h2>
+    <div id="editor-help" class="help"></div>
+    <div class="grid">
+      <label>이름<input id="f-name" type="text" maxlength="60"></label>
+      <label class="color">색상<input id="f-color" type="color"></label>
+
+      <label class="wide ics-only">ICS 주소
+        <input id="f-ics" type="password" autocomplete="off" spellcheck="false" placeholder="https://… 또는 webcal://…">
+      </label>
+
+      <label class="wide caldav-only">서버 주소<input id="f-url" type="text" spellcheck="false" placeholder="https://"></label>
+      <label class="caldav-only">아이디<input id="f-user" type="text" autocomplete="off" spellcheck="false"></label>
+      <label class="caldav-only">비밀번호<input id="f-pass" type="password" autocomplete="off"></label>
+      <label class="wide caldav-only">가져올 캘린더 <span class="muted">(쉼표로 구분, 비우면 전체)</span>
+        <input id="f-cals" type="text" spellcheck="false">
+      </label>
+    </div>
+    <div id="test-result" class="test-result"></div>
+    <div class="buttons">
+      <button id="btn-test">연결 테스트</button>
+      <span class="spacer"></span>
+      <button id="btn-cancel">취소</button>
+      <button id="btn-save" class="primary">저장</button>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>일반</h2>
+    <div class="grid">
+      <label>새로고침 간격 (분)<input id="g-refresh" type="number" min="1" max="1440"></label>
+      <label>표시할 기간 (일)<input id="g-days" type="number" min="1" max="90"></label>
+      <label>시작 전 알림 (분, 0 = 끔)<input id="g-notify" type="number" min="0" max="1440"></label>
+      <label>배경 불투명도 <span id="g-opacity-val" class="muted"></span><input id="g-opacity" type="range" min="0.2" max="1" step="0.05"></label>
+      <label>창 배치
+        <select id="g-placement">
+          <option value="desktop">바탕화면에 고정 (다른 창 뒤에 표시)</option>
+          <option value="normal">일반 창</option>
+          <option value="top">항상 위에 표시</option>
+        </select>
+      </label>
+      <label class="check"><input id="g-lock" type="checkbox"> 위치·크기 잠금</label>
+      <label class="check"><input id="g-login" type="checkbox"> Windows 시작 시 실행 <span class="muted">(설치본에서만 적용)</span></label>
+    </div>
+    <div class="buttons">
+      <span id="general-saved" class="muted"></span>
+      <span class="spacer"></span>
+      <button id="btn-general" class="primary">일반 설정 저장</button>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>동기화 상태</h2>
+    <div id="sync-status" class="muted"></div>
+    <ul id="sync-errors" class="errors"></ul>
+  </section>
+
+  <script src="settings.js"></script>
+</body>
+</html>

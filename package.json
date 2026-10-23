@@ -1,0 +1,58 @@
+{
+  "name": "calendar-widget",
+  "productName": "CalendarWidget",
+  "version": "1.0.0",
+  "description": "여러 캘린더(Google, Outlook, 네이버, iCloud, ICS/CalDAV)를 한데 모아 보여주는 Windows 바탕화면 위젯",
+  "author": "jm.jeon",
+  "main": "src/main.js",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "commonjs",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test",
+    "icon": "node scripts/make-icon.js",
+    "dist": "node scripts/make-icon.js && electron-builder --win --x64"
+  },
+  "dependencies": {
+    "koffi": "^3.3.3",
+    "node-ical": "^0.27.3",
+    "tsdav": "^2.5.0"
+  },
+  "devDependencies": {
+    "electron": "^45.0.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.calendarwidget.app",
+    "productName": "CalendarWidget",
+    "copyright": "Copyright © 2026",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "캘린더 위젯",
+      "uninstallDisplayName": "캘린더 위젯",
+      "artifactName": "CalendarWidget-Setup-${version}.${ext}"
+    }
+  }
+}
